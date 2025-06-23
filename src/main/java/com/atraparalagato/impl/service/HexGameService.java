@@ -9,6 +9,7 @@ import com.atraparalagato.impl.strategy.AStarCatMovement;
 import com.atraparalagato.impl.strategy.BFSCatMovement;
 import com.atraparalagato.impl.model.HexGameState;
 import com.atraparalagato.impl.model.HexGameBoard;
+import com.atraparalagato.impl.repository.H2GameRepository;
 
 import java.util.*;
 
@@ -26,22 +27,23 @@ import java.util.*;
  */
 public class HexGameService extends GameService<HexPosition> {
     
-    // TODO: Los estudiantes deben inyectar dependencias
-    // Ejemplos: repository, movementStrategy, validator, etc.
-    
+    // Dependencias básicas para la implementación simplificada
+    private final H2GameRepository repository;
+
     public HexGameService() {
-        // TODO: Los estudiantes deben inyectar las dependencias requeridas
+        this(new H2GameRepository());
+    }
+
+    private HexGameService(H2GameRepository repo) {
         super(
-            null, // gameBoard - TODO: Crear HexGameBoard
-            null, // movementStrategy - TODO: Crear estrategia de movimiento
-            null, // gameRepository - TODO: Crear repositorio
-            null, // gameIdGenerator - TODO: Crear generador de IDs
-            null, // boardFactory - TODO: Crear factory de tableros
-            null  // gameStateFactory - TODO: Crear factory de estados
+            new HexGameBoard(5),
+            new BFSCatMovement(new HexGameBoard(5)),
+            repo,
+            UUID::randomUUID,
+            HexGameBoard::new,
+            id -> new HexGameState(id, 5)
         );
-        // TODO: Inicializar dependencias y configuración
-        // Pista: Usar el patrón Factory para crear componentes
-        throw new UnsupportedOperationException("Los estudiantes deben implementar el constructor");
+        this.repository = repo;
     }
     
     /**
@@ -49,72 +51,68 @@ public class HexGameService extends GameService<HexPosition> {
      * Debe ser más sofisticado que ExampleGameService.
      */
     public HexGameState createGame(int boardSize, String difficulty, Map<String, Object> options) {
-        // TODO: Implementar creación de juego avanzada
-        // Considerar:
-        // 1. Validar parámetros de entrada
         if (boardSize < 3 || boardSize > 10) {
             throw new IllegalArgumentException("El tamaño del tablero debe estar entre 3 y 10.");
         }
-        if (difficulty == null || 
-            !(difficulty.equalsIgnoreCase("easy") || difficulty.equalsIgnoreCase("hard"))) {
+        if (difficulty == null ||
+            !("easy".equalsIgnoreCase(difficulty) || "hard".equalsIgnoreCase(difficulty))) {
             throw new IllegalArgumentException("La dificultad debe ser 'easy' o 'hard'.");
-        }        
+        }
         if (options == null) {
             throw new IllegalArgumentException("Las opciones no pueden ser nulas.");
         }
-        // 2. Crear tablero según dificultad
-        // Definir tamaño del tablero según dificultad
-        int size;
-        if (difficulty.equalsIgnoreCase("easy")) {
-            size = 5;
-        } else {
-            size = 7;
-        }
-        HexGameBoard board = new HexGameBoard(size);
 
-        // 3. Configurar estrategia del gato según dificultad
-        CatMovementStrategy catStrategy = difficulty.equalsIgnoreCase("easy") ?
-            new BFSCatMovement(board) : new AStarCatMovement(board);
+        HexGameState gameState = new HexGameState(UUID.randomUUID().toString(), boardSize);
+        // El constructor ya crea el tablero y coloca al gato en el centro
 
-        // Posición inicial del gato (por ejemplo, al centro)
-        HexPosition catPosition = new HexPosition(size / 2, size / 2);
-
-        // 4. Inicializar estado del juego
-        String gameId = UUID.randomUUID().toString();
-        // 5. Guardar en repositorio
-        // 6. Configurar callbacks y eventos
-        return new HexGameState();
+        repository.save(gameState);
+        return gameState;
     }
     
     /**
      * TODO: Ejecutar movimiento del jugador con validaciones avanzadas.
      */
     public Optional<HexGameState> executePlayerMove(String gameId, HexPosition position, String playerId) {
-        // TODO: Implementar movimiento del jugador
-        // Considerar:
-        // 1. Validar que el juego existe y está activo
-        // 2. Validar que el jugador puede hacer el movimiento
-        // 3. Validar la posición según reglas del juego
-        // 4. Ejecutar el movimiento
-        // 5. Mover el gato usando estrategia apropiada
-        // 6. Actualizar estado del juego
-        // 7. Guardar cambios en repositorio
-        // 8. Notificar eventos
-        throw new UnsupportedOperationException("Los estudiantes deben implementar executePlayerMove");
+        Optional<HexGameState> stateOpt = repository.findById(gameId);
+        if (stateOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        HexGameState state = stateOpt.get();
+
+        if (state.isGameFinished() || !state.getGameBoard().isValidMove(position)) {
+            return Optional.of(state);
+        }
+
+        state.executeMove(position);
+
+        // Mover el gato de forma simple utilizando BFS
+        CatMovementStrategy<HexPosition> strategy = new BFSCatMovement(state.getGameBoard());
+        strategy.findBestMove(state.getCatPosition(), getTargetPosition(state))
+                .ifPresent(state::setCatPosition);
+
+        repository.save(state);
+        return Optional.of(state);
     }
     
     /**
      * TODO: Obtener estado del juego con información enriquecida.
      */
     public Optional<Map<String, Object>> getEnrichedGameState(String gameId) {
-        // TODO: Obtener estado enriquecido del juego
-        // Incluir:
-        // 1. Estado básico del juego
-        // 2. Estadísticas avanzadas
-        // 3. Sugerencias de movimiento
-        // 4. Análisis de la partida
-        // 5. Información del tablero
-        throw new UnsupportedOperationException("Los estudiantes deben implementar getEnrichedGameState");
+        Optional<HexGameState> stateOpt = repository.findById(gameId);
+        if (stateOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        HexGameState state = stateOpt.get();
+        Map<String, Object> map = new HashMap<>();
+        map.put("gameId", state.getGameId());
+        map.put("status", state.getStatus().toString());
+        map.put("catPosition", Map.of("q", state.getCatPosition().getQ(), "r", state.getCatPosition().getR()));
+        map.put("blockedCells", state.getGameBoard().getBlockedPositions());
+        map.put("movesCount", state.getMoveCount());
+        map.put("boardSize", state.getBoardSize());
+        return Optional.of(map);
     }
     
     /**
@@ -247,34 +245,48 @@ public class HexGameService extends GameService<HexPosition> {
     }
 
     // Métodos abstractos requeridos por GameService
-    
+
     @Override
     protected void initializeGame(GameState<HexPosition> gameState, GameBoard<HexPosition> gameBoard) {
-        // TODO: Inicializar el juego con estado y tablero
-        throw new UnsupportedOperationException("Los estudiantes deben implementar initializeGame");
+        if (gameState instanceof HexGameState hexState) {
+            hexState.setCatPosition(new HexPosition(0, 0));
+        }
     }
-    
+
     @Override
     public boolean isValidMove(String gameId, HexPosition position) {
-        // TODO: Validar si un movimiento es válido
-        throw new UnsupportedOperationException("Los estudiantes deben implementar isValidMove");
+        return repository.findById(gameId)
+                .map(gs -> gs.getGameBoard().isValidMove(position))
+                .orElse(false);
     }
-    
+
     @Override
     public Optional<HexPosition> getSuggestedMove(String gameId) {
-        // TODO: Obtener sugerencia de movimiento
-        throw new UnsupportedOperationException("Los estudiantes deben implementar getSuggestedMove");
+        return repository.findById(gameId)
+                .flatMap(gs -> gs.getGameBoard()
+                        .getAdjacentPositions(gs.getCatPosition())
+                        .stream()
+                        .filter(pos -> !gs.getGameBoard().isBlocked(pos))
+                        .findFirst());
     }
-    
+
     @Override
     protected HexPosition getTargetPosition(GameState<HexPosition> gameState) {
-        // TODO: Obtener posición objetivo para el gato
-        throw new UnsupportedOperationException("Los estudiantes deben implementar getTargetPosition");
+        if (gameState instanceof HexGameState hexState) {
+            int size = hexState.getBoardSize();
+            return new HexPosition(size, 0);
+        }
+        return new HexPosition(0, 0);
     }
-    
+
     @Override
     public Object getGameStatistics(String gameId) {
-        // TODO: Obtener estadísticas del juego
-        throw new UnsupportedOperationException("Los estudiantes deben implementar getGameStatistics");
+        return repository.findById(gameId)
+                .map(gs -> Map.of(
+                        "gameId", gs.getGameId(),
+                        "status", gs.getStatus().toString(),
+                        "moveCount", gs.getMoveCount(),
+                        "boardSize", gs.getBoardSize()))
+                .orElse(Map.of("error", "Game not found"));
     }
-} 
+}
