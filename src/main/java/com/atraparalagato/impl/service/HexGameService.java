@@ -38,7 +38,7 @@ public class HexGameService extends GameService<HexPosition> {
         super(
             new HexGameBoard(5),
             new BFSCatMovement(new HexGameBoard(5)),
-            repo,
+            (com.atraparalagato.base.repository.DataRepository<com.atraparalagato.base.model.GameState<HexPosition>, String>)(com.atraparalagato.base.repository.DataRepository<?>) repo,
             UUID::randomUUID,
             HexGameBoard::new,
             id -> new HexGameState(id, 5)
@@ -80,11 +80,13 @@ public class HexGameService extends GameService<HexPosition> {
 
         HexGameState state = stateOpt.get();
 
-        if (state.isGameFinished() || !state.getGameBoard().isValidMove(position)) {
+        if (state.isGameFinished()) {
             return Optional.of(state);
         }
 
-        state.executeMove(position);
+        if (!state.executeMove(position)) {
+            return Optional.of(state);
+        }
 
         // Mover el gato de forma simple utilizando BFS
         CatMovementStrategy<HexPosition> strategy = new BFSCatMovement(state.getGameBoard());
