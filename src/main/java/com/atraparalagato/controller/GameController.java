@@ -23,13 +23,13 @@ import java.util.Optional;
 @CrossOrigin(origins = "*")
 public class GameController {
     
-    @Value("${game.use-example-implementation:false}")
-    private boolean useExampleImplementation;
-    
+    private final boolean useExampleImplementation;
+
     private ExampleGameService exampleGameService;
     private HexGameService hexGameService;
-    
-    public GameController() {
+
+    public GameController(@Value("${game.use-example-implementation:false}") boolean useExampleImplementation) {
+        this.useExampleImplementation = useExampleImplementation;
         try {
             if (useExampleImplementation) {
                 this.exampleGameService = new ExampleGameService();
@@ -218,35 +218,50 @@ public class GameController {
     // Métodos privados para implementación de estudiantes (placeholder)
     
     private ResponseEntity<Map<String, Object>> startGameWithStudentImplementation(int boardSize) {
-        var gameState = HexGameService.createGame(boardSize, dificulty, options);
-        
+        String difficulty = "easy";
+        Map<String, Object> options = new HashMap<>();
+
+        var gameState = hexGameService.createGame(boardSize, difficulty, options);
+
         Map<String, Object> response = new HashMap<>();
         response.put("gameId", gameState.getGameId());
         response.put("status", gameState.getStatus().toString());
         response.put("catPosition", Map.of("q", gameState.getCatPosition().getQ(), "r", gameState.getCatPosition().getR()));
         response.put("blockedCells", gameState.getGameBoard().getBlockedPositions());
         response.put("movesCount", gameState.getMoveCount());
-        response.put("boardSize", boardSize);
-        response.put("implementation", "example");
-        
+        response.put("boardSize", gameState.getBoardSize());
+        response.put("implementation", "impl");
+
         return ResponseEntity.ok(response);
     }
-    
+
     private ResponseEntity<Map<String, Object>> blockPositionWithStudentImplementation(String gameId, HexPosition position) {
-        // TODO: Los estudiantes deben implementar esto usando sus propias clases
-        return ResponseEntity.ok(Map.of(
-            "error", "Student implementation not available yet",
-            "message", "Los estudiantes deben completar sus implementaciones en el paquete 'impl'",
-            "implementation", "impl"
-        ));
+        var gameStateOpt = hexGameService.executePlayerMove(gameId, position, "player1");
+
+        if (gameStateOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        var gameState = gameStateOpt.get();
+        Map<String, Object> response = new HashMap<>();
+        response.put("gameId", gameState.getGameId());
+        response.put("status", gameState.getStatus().toString());
+        response.put("catPosition", Map.of("q", gameState.getCatPosition().getQ(), "r", gameState.getCatPosition().getR()));
+        response.put("blockedCells", gameState.getGameBoard().getBlockedPositions());
+        response.put("movesCount", gameState.getMoveCount());
+        response.put("implementation", "impl");
+
+        return ResponseEntity.ok(response);
     }
-    
+
     private ResponseEntity<Map<String, Object>> getGameStateWithStudentImplementation(String gameId) {
-        // TODO: Los estudiantes deben implementar esto usando sus propias clases
-        return ResponseEntity.ok(Map.of(
-            "error", "Student implementation not available yet",
-            "message", "Los estudiantes deben completar sus implementaciones en el paquete 'impl'",
-            "implementation", "impl"
-        ));
+        var stateOpt = hexGameService.getEnrichedGameState(gameId);
+        if (stateOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Map<String, Object> response = stateOpt.get();
+        response.put("implementation", "impl");
+        return ResponseEntity.ok(response);
     }
-} 
+}
