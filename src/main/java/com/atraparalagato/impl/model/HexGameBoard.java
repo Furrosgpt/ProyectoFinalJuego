@@ -2,10 +2,15 @@ package com.atraparalagato.impl.model;
 
 import com.atraparalagato.base.model.GameBoard;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Implementación esqueleto de GameBoard para tableros hexagonales.
@@ -25,77 +30,117 @@ public class HexGameBoard extends GameBoard<HexPosition> {
     
     @Override
     protected Set<HexPosition> initializeBlockedPositions() {
-        // TODO: Los estudiantes deben decidir qué estructura de datos usar
-        // Opciones: HashSet, TreeSet, LinkedHashSet, etc.
-        // Considerar rendimiento vs orden vs duplicados
+        // Usar HashSet para almacenamiento eficiente
         return new HashSet<>();
     }
     
     @Override
-    protected boolean isPositionInBounds(HexPosition position) {
-        // TODO: Implementar validación de límites para tablero hexagonal
-        // Pista: Usar coordenadas axiales q, r, s
-        // Condición: |q| <= size && |r| <= size && |s| <= size
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+    public boolean isPositionInBounds(HexPosition position) {
+        // Verificar límites hexagonales usando coordenadas axiales
+        // Las posiciones válidas incluyen el borde para que el gato pueda escapar
+        return Math.abs(position.getQ()) <= size && 
+               Math.abs(position.getR()) <= size && 
+               Math.abs(position.getS()) <= size;
     }
     
     @Override
     protected boolean isValidMove(HexPosition position) {
-        // TODO: Combinar validación de límites y estado actual
-        // Debe verificar:
-        // 1. Que la posición esté dentro de los límites
-        // 2. Que la posición no esté ya bloqueada
-        // 3. Cualquier regla adicional del juego
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        // Un movimiento del JUGADOR es válido si está DENTRO del tablero (no en el borde) y no está bloqueado
+        // El gato puede moverse al borde, pero el jugador no puede bloquear el borde
+        return isPositionInBounds(position) && 
+               !isAtBorder(position) && 
+               !isBlocked(position);
     }
     
     @Override
     protected void executeMove(HexPosition position) {
-        // TODO: Actualizar el estado interno del tablero
         // Agregar la posición a las posiciones bloqueadas
-        // Considerar si necesita validación adicional
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        blockedPositions.add(position);
     }
     
     @Override
     public List<HexPosition> getPositionsWhere(Predicate<HexPosition> condition) {
-        // TODO: Implementar usando programación funcional
-        // Generar todas las posiciones posibles del tablero
-        // Filtrar usando el Predicate
-        // Retornar como List
-        // 
-        // Ejemplo de uso de streams:
-        // return getAllPossiblePositions().stream()
-        //     .filter(condition)
-        //     .collect(Collectors.toList());
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        // Generar todas las posiciones posibles y filtrar
+        return getAllPossiblePositions().stream()
+                .filter(condition)
+                .collect(Collectors.toList());
     }
     
     @Override
     public List<HexPosition> getAdjacentPositions(HexPosition position) {
-        // TODO: Obtener las 6 posiciones adyacentes en un tablero hexagonal
-        // Direcciones hexagonales: (+1,0), (+1,-1), (0,-1), (-1,0), (-1,+1), (0,+1)
-        // Filtrar las que estén dentro de los límites del tablero
-        // 
-        // Pista: Crear array de direcciones y usar streams para mapear
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        // Direcciones hexagonales: las 6 direcciones posibles
+        HexPosition[] directions = {
+            new HexPosition(1, 0),   // Este
+            new HexPosition(1, -1),  // Noreste
+            new HexPosition(0, -1),  // Noroeste
+            new HexPosition(-1, 0),  // Oeste
+            new HexPosition(-1, 1),  // Suroeste
+            new HexPosition(0, 1)    // Sureste
+        };
+        
+        return Arrays.stream(directions)
+                .map(dir -> (HexPosition) position.add(dir))
+                .filter(this::isPositionInBounds) // Incluye posiciones del borde
+                .filter(pos -> !isBlocked(pos))   // Excluye posiciones bloqueadas
+                .collect(Collectors.toList());
     }
     
     @Override
     public boolean isBlocked(HexPosition position) {
-        // TODO: Verificar si una posición está en el conjunto de bloqueadas
-        // Método simple de consulta
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        // Verificar si la posición está en el conjunto de bloqueadas
+        return blockedPositions.contains(position);
+    }
+
+    public boolean isAtBorder(HexPosition position) {
+        return Math.abs(position.getQ()) == size ||
+               Math.abs(position.getR()) == size ||
+               Math.abs(position.getS()) == size;
     }
     
-    // Método auxiliar que los estudiantes pueden implementar
+    // Método auxiliar para generar todas las posiciones posibles
     private List<HexPosition> getAllPossiblePositions() {
-        // TODO: Generar todas las posiciones válidas del tablero
-        // Usar doble loop para q y r, calcular s = -q - r
-        // Filtrar posiciones que estén dentro de los límites
-        throw new UnsupportedOperationException("Método auxiliar para implementar");
+        List<HexPosition> positions = new ArrayList<>();
+        
+        // Generar todas las posiciones dentro del tablero (excluyendo el borde para jugabilidad)
+        for (int q = -size + 1; q < size; q++) {
+            for (int r = -size + 1; r < size; r++) {
+                HexPosition pos = new HexPosition(q, r);
+                // Solo incluir posiciones que no están en el borde (donde el jugador puede jugar)
+                if (isPositionInBounds(pos) && !isAtBorder(pos)) {
+                    positions.add(pos);
+                }
+            }
+        }
+        
+        return positions;
     }
     
+    // Método adicional útil para debugging
+    public void printBoard() {
+        System.out.println("Estado del tablero (tamaño: " + size + "):");
+        System.out.println("Posiciones bloqueadas: " + blockedPositions.size());
+        
+        // Imprimir algunas estadísticas básicas
+        long totalPositions = getAllPossiblePositions().size();
+        System.out.println("Total de posiciones: " + totalPositions);
+        System.out.println("Posiciones libres: " + (totalPositions - blockedPositions.size()));
+    }
+    
+    // Método para obtener estadísticas del tablero
+    public Map<String, Object> getBoardStatistics() {
+        Map<String, Object> stats = new HashMap<>();
+        List<HexPosition> allPositions = getAllPossiblePositions();
+        
+        stats.put("boardSize", size);
+        stats.put("totalPositions", allPositions.size());
+        stats.put("blockedPositions", blockedPositions.size());
+        stats.put("freePositions", allPositions.size() - blockedPositions.size());
+        stats.put("blockagePercentage", 
+                  (double) blockedPositions.size() / allPositions.size() * 100);
+        
+        return stats;
+    }
+
     // Hook method override - ejemplo de extensibilidad
     @Override
     protected void onMoveExecuted(HexPosition position) {

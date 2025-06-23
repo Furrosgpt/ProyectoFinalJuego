@@ -5,12 +5,12 @@ import com.atraparalagato.base.model.GameState;
 import com.atraparalagato.base.model.GameBoard;
 import com.atraparalagato.base.strategy.CatMovementStrategy;
 import com.atraparalagato.impl.model.HexPosition;
+import com.atraparalagato.impl.strategy.AStarCatMovement;
+import com.atraparalagato.impl.strategy.BFSCatMovement;
 import com.atraparalagato.impl.model.HexGameState;
 import com.atraparalagato.impl.model.HexGameBoard;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Implementación esqueleto de GameService para el juego hexagonal.
@@ -52,12 +52,38 @@ public class HexGameService extends GameService<HexPosition> {
         // TODO: Implementar creación de juego avanzada
         // Considerar:
         // 1. Validar parámetros de entrada
+        if (boardSize < 3 || boardSize > 10) {
+            throw new IllegalArgumentException("El tamaño del tablero debe estar entre 3 y 10.");
+        }
+        if (difficulty == null || 
+            !(difficulty.equalsIgnoreCase("easy") || difficulty.equalsIgnoreCase("hard"))) {
+            throw new IllegalArgumentException("La dificultad debe ser 'easy' o 'hard'.");
+        }        
+        if (options == null) {
+            throw new IllegalArgumentException("Las opciones no pueden ser nulas.");
+        }
         // 2. Crear tablero según dificultad
+        // Definir tamaño del tablero según dificultad
+        int size;
+        if (difficulty.equalsIgnoreCase("easy")) {
+            size = 5;
+        } else {
+            size = 7;
+        }
+        HexGameBoard board = new HexGameBoard(size);
+
         // 3. Configurar estrategia del gato según dificultad
+        CatMovementStrategy catStrategy = difficulty.equalsIgnoreCase("easy") ?
+            new BFSCatMovement(board) : new AStarCatMovement(board);
+
+        // Posición inicial del gato (por ejemplo, al centro)
+        HexPosition catPosition = new HexPosition(size / 2, size / 2);
+
         // 4. Inicializar estado del juego
+        String gameId = UUID.randomUUID().toString();
         // 5. Guardar en repositorio
         // 6. Configurar callbacks y eventos
-        throw new UnsupportedOperationException("Los estudiantes deben implementar createGame");
+        return new HexGameState();
     }
     
     /**

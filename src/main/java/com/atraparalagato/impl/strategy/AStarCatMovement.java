@@ -25,91 +25,184 @@ public class AStarCatMovement extends CatMovementStrategy<HexPosition> {
     }
     
     @Override
-    protected List<HexPosition> getPossibleMoves(HexPosition currentPosition) {
-        // TODO: Obtener movimientos válidos desde la posición actual
-        // Usar board.getAdjacentPositions() y filtrar posiciones válidas
-        // No incluir posiciones bloqueadas
-        // 
-        // Pista: Usar streams para filtrar
-        // return board.getAdjacentPositions(currentPosition).stream()
-        //     .filter(pos -> !board.isBlocked(pos))
-        //     .collect(Collectors.toList());
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+    public List<HexPosition> getPossibleMoves(HexPosition currentPosition) {
+        // Obtener posiciones adyacentes que no estén bloqueadas
+        return board.getAdjacentPositions(currentPosition).stream()
+                .filter(pos -> !board.isBlocked(pos))
+                .toList();
     }
     
     @Override
     protected Optional<HexPosition> selectBestMove(List<HexPosition> possibleMoves, 
-                                                  HexPosition currentPosition, 
-                                                  HexPosition targetPosition) {
-        // TODO: Implementar selección del mejor movimiento usando A*
-        // Calcular f(n) = g(n) + h(n) para cada movimiento posible
-        // g(n) = costo desde inicio hasta n
-        // h(n) = heurística desde n hasta objetivo
-        // Retornar el movimiento con menor f(n)
-        // 
-        // Pista: Usar Function para calcular costos y comparar
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+                                                   HexPosition currentPosition, 
+                                                   HexPosition targetPosition) {
+        HexPosition bestMove = null;
+        double bestCost = Double.POSITIVE_INFINITY;
+    
+        for (HexPosition move : possibleMoves) {
+            double cost = aStarCost(move, targetPosition);
+            if (cost < bestCost) {
+                bestCost = cost;
+                bestMove = move;
+            }
+        }
+        return Optional.ofNullable(bestMove);
+    }
+
+    public Optional<HexPosition> getNextMove(HexPosition catPosition, HexPosition targetPosition) {
+        List<HexPosition> possibleMoves = getPossibleMoves(catPosition);
+        return selectBestMove(possibleMoves, catPosition, targetPosition);
+    }
+    
+    
+    // Implementación de A*
+    private double aStarCost(HexPosition start, HexPosition goal) {
+        // Heurística
+        Function<HexPosition, Double> heuristic = getHeuristicFunction(goal);
+
+        // Estructuras para A*
+        PriorityQueue<AStarNode> openSet = new PriorityQueue<>(Comparator.comparingDouble(n -> n.fScore));
+        Map<HexPosition, Double> gScore = new HashMap<>();
+        Set<HexPosition> closedSet = new HashSet<>();
+
+        gScore.put(start, 0.0);
+        openSet.add(new AStarNode(start, 0.0, heuristic.apply(start), null));
+
+        while (!openSet.isEmpty()) {
+            AStarNode current = openSet.poll();
+
+            if (current.position.equals(goal)) {
+                // Llegaste al objetivo, retorna el costo total
+                return current.gScore;
+            }
+
+            closedSet.add(current.position);
+
+            for (HexPosition neighbor : board.getAdjacentPositions(current.position)) {
+                if (closedSet.contains(neighbor) || board.isBlocked(neighbor)) continue;
+
+                double tentativeG = current.gScore + getMoveCost(current.position, neighbor);
+                if (tentativeG < gScore.getOrDefault(neighbor, Double.POSITIVE_INFINITY)) {
+                    gScore.put(neighbor, tentativeG);
+                    double fScore = tentativeG + heuristic.apply(neighbor);
+                    openSet.add(new AStarNode(neighbor, tentativeG, fScore, current));
+                }
+            }
+        }
+        return Double.POSITIVE_INFINITY; // No hay camino
     }
     
     @Override
     protected Function<HexPosition, Double> getHeuristicFunction(HexPosition targetPosition) {
-        // TODO: Implementar función heurística
-        // Para tablero hexagonal, usar distancia hexagonal
-        // La heurística debe ser admisible (nunca sobreestimar el costo real)
-        // 
-        // Ejemplo:
-        // return position -> position.distanceTo(targetPosition);
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        // Heurística simple: distancia al borde más cercano
+        return position -> {
+            int boardSize = board.getSize();
+            
+            // Calcular distancia mínima al borde
+            double distanceToBorder = Math.min(
+                Math.min(boardSize - Math.abs(position.getQ()),
+                        boardSize - Math.abs(position.getR())),
+                boardSize - Math.abs(position.getS())
+            );
+            
+            // Invertir para que menor distancia al borde = mejor puntuación
+            return boardSize - distanceToBorder;
+        };
     }
     
     @Override
     protected Predicate<HexPosition> getGoalPredicate() {
-        // TODO: Definir qué posiciones son objetivos válidos
-        // Para "atrapar al gato", el objetivo son las posiciones del borde
-        // 
-        // Pista: Una posición está en el borde si está en el límite del tablero
-        // return position -> Math.abs(position.getQ()) == board.getSize() ||
-        //                   Math.abs(position.getR()) == board.getSize() ||
-        //                   Math.abs(position.getS()) == board.getSize();
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        // El objetivo es llegar al borde del tablero
+        return position -> {
+            int boardSize = board.getSize();
+            return Math.abs(position.getQ()) >= boardSize ||
+                   Math.abs(position.getR()) >= boardSize ||
+                   Math.abs(position.getS()) >= boardSize;
+        };
     }
     
     @Override
     protected double getMoveCost(HexPosition from, HexPosition to) {
-        // TODO: Calcular costo de moverse entre dos posiciones
-        // Para tablero hexagonal, normalmente es 1.0 para posiciones adyacentes
-        // Puede variar según reglas específicas del juego
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        // Costo uniforme para movimientos adyacentes
+        return 1.0;
     }
     
     @Override
     public boolean hasPathToGoal(HexPosition currentPosition) {
-        // TODO: Verificar si existe camino desde posición actual hasta cualquier objetivo
-        // Usar BFS o A* para explorar hasta encontrar una posición objetivo
-        // Retornar true si se encuentra camino, false si no
-        // 
-        // Pista: Usar getGoalPredicate() para identificar objetivos
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        Function<HexPosition, Double> heuristic = pos -> 0.0; // Para solo búsqueda, heurística 0
+        Predicate<HexPosition> isGoal = getGoalPredicate();
+    
+        PriorityQueue<AStarNode> openSet = new PriorityQueue<>(Comparator.comparingDouble(n -> n.fScore));
+        Set<HexPosition> closedSet = new HashSet<>();
+        openSet.add(new AStarNode(currentPosition, 0.0, heuristic.apply(currentPosition), null));
+    
+        while (!openSet.isEmpty()) {
+            AStarNode current = openSet.poll();
+    
+            if (isGoal.test(current.position)) {
+                return true; // Encontró camino al objetivo
+            }
+    
+            closedSet.add(current.position);
+    
+            for (HexPosition neighbor : board.getAdjacentPositions(current.position)) {
+                if (closedSet.contains(neighbor) || board.isBlocked(neighbor)) continue;
+    
+                double tentativeG = current.gScore + getMoveCost(current.position, neighbor);
+    
+                // Solo agrega si no está ya en la cola con mejor score
+                boolean alreadyInOpen = openSet.stream().anyMatch(n -> n.position.equals(neighbor) && n.gScore <= tentativeG);
+                if (!alreadyInOpen) {
+                    double fScore = tentativeG + heuristic.apply(neighbor);
+                    openSet.add(new AStarNode(neighbor, tentativeG, fScore, current));
+                }
+            }
+        }
+        return false; // No hay camino al objetivo
     }
+    
     
     @Override
     public List<HexPosition> getFullPath(HexPosition currentPosition, HexPosition targetPosition) {
-        // TODO: Implementar A* completo para obtener el camino completo
-        // Usar PriorityQueue para nodos a explorar
-        // Mantener Map de padres para reconstruir el camino
-        // Retornar lista de posiciones desde inicio hasta objetivo
-        // 
-        // Estructura sugerida:
-        // 1. Inicializar estructuras de datos (openSet, closedSet, gScore, fScore, cameFrom)
-        // 2. Agregar posición inicial a openSet
-        // 3. Mientras openSet no esté vacío:
-        //    a. Tomar nodo con menor fScore
-        //    b. Si es objetivo, reconstruir y retornar camino
-        //    c. Mover a closedSet
-        //    d. Para cada vecino válido, calcular scores y actualizar
-        // 4. Si no se encuentra camino, retornar lista vacía
-        throw new UnsupportedOperationException("Los estudiantes deben implementar este método");
+        Function<HexPosition, Double> heuristic = getHeuristicFunction(targetPosition);
+    
+        PriorityQueue<AStarNode> openSet = new PriorityQueue<>(Comparator.comparingDouble(n -> n.fScore));
+        Map<HexPosition, Double> gScore = new HashMap<>();
+        Map<HexPosition, AStarNode> nodeMap = new HashMap<>();
+        Set<HexPosition> closedSet = new HashSet<>();
+    
+        gScore.put(currentPosition, 0.0);
+        AStarNode startNode = new AStarNode(currentPosition, 0.0, heuristic.apply(currentPosition), null);
+        openSet.add(startNode);
+        nodeMap.put(currentPosition, startNode);
+    
+        while (!openSet.isEmpty()) {
+            AStarNode current = openSet.poll();
+    
+            if (current.position.equals(targetPosition)) {
+                // ¡Objetivo encontrado! Reconstruye el camino y retorna
+                return reconstructPath(current);
+            }
+    
+            closedSet.add(current.position);
+    
+            for (HexPosition neighbor : board.getAdjacentPositions(current.position)) {
+                if (closedSet.contains(neighbor) || board.isBlocked(neighbor)) continue;
+    
+                double tentativeG = current.gScore + getMoveCost(current.position, neighbor);
+                if (tentativeG < gScore.getOrDefault(neighbor, Double.POSITIVE_INFINITY)) {
+                    gScore.put(neighbor, tentativeG);
+                    double fScore = tentativeG + heuristic.apply(neighbor);
+                    AStarNode neighborNode = new AStarNode(neighbor, tentativeG, fScore, current);
+                    openSet.add(neighborNode);
+                    nodeMap.put(neighbor, neighborNode);
+                }
+            }
+        }
+        // Si no se encontró camino
+        return Collections.emptyList();
     }
+    
     
     // Clase auxiliar para nodos del algoritmo A*
     private static class AStarNode {
@@ -126,13 +219,15 @@ public class AStarCatMovement extends CatMovementStrategy<HexPosition> {
         }
     }
     
-    // Método auxiliar para reconstruir el camino
     private List<HexPosition> reconstructPath(AStarNode goalNode) {
-        // TODO: Reconstruir camino desde nodo objetivo hasta inicio
-        // Seguir la cadena de padres hasta llegar al inicio
-        // Retornar lista en orden correcto (desde inicio hasta objetivo)
-        throw new UnsupportedOperationException("Método auxiliar para implementar");
-    }
+        List<HexPosition> path = new LinkedList<>();
+        AStarNode current = goalNode;
+        while (current != null) {
+            path.add(0, current.position); // Inserta al inicio para invertir el orden
+            current = current.parent;
+        }
+        return path;
+    }    
     
     // Hook methods - los estudiantes pueden override para debugging
     @Override
